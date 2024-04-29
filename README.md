@@ -44,6 +44,17 @@ To request an Enterprise License please complete the form at [Ultralytics Licens
 </div>
 </div>
 
+## <div align="center">Deltia Build</div>
+
+1. `python3.11 -m venv .venv`
+2. `pip install -e .`
+3. `pip install --upgrade build`
+4. `pip install twine`
+5. update code and update version in `ultralytics.__init__.py`
+6. `python -m build`
+7. `aws codeartifact login --tool twine --domain my_domain --domain-owner 111122223333 --repository my_repo` - update accordingly
+8. `twine upload --verbose --repository codeartifact dist/*`
+
 ## <div align="center">Documentation</div>
 
 See below for a quickstart installation and usage example, and see the [YOLOv8 Docs](https://docs.ultralytics.com) for full documentation on training, validation, prediction and deployment.
