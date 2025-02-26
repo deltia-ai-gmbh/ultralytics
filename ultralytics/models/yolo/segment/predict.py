@@ -49,9 +49,24 @@ class SegmentationPredictor(DetectionPredictor):
                 masks = None
             elif self.args.retina_masks:
                 pred[:, :4] = ops.scale_boxes(img.shape[2:], pred[:, :4], orig_img.shape)
-                masks = ops.process_mask_native(proto[i], pred[:, 6:], pred[:, :4], orig_img.shape[:2])  # HWC
+                masks = ops.process_mask_native(
+                    proto[i],
+                    pred[:, 6:],
+                    pred[:, :4],
+                    orig_img.shape[:2],
+                    box_margin_factor=self.args.box_margin_factor,
+                    box_max_margin=self.args.box_max_margin
+                )  # HWC
             else:
-                masks = ops.process_mask(proto[i], pred[:, 6:], pred[:, :4], img.shape[2:], upsample=True)  # HWC
+                masks = ops.process_mask(
+                    proto[i],
+                    pred[:, 6:],
+                    pred[:, :4],
+                    img.shape[2:],
+                    upsample=True,
+                    box_margin_factor=self.args.box_margin_factor,
+                    box_max_margin=self.args.box_max_margin
+                )  # HWC
                 pred[:, :4] = ops.scale_boxes(img.shape[2:], pred[:, :4], orig_img.shape)
             results.append(Results(orig_img, path=img_path, names=self.model.names, boxes=pred[:, :6], masks=masks))
         return results

@@ -627,19 +627,38 @@ def resample_segments(segments, n=1000):
     return segments
 
 
-def crop_mask(masks, boxes):
+def crop_mask(masks, boxes, box_margin_factor=1, box_max_margin=30):
     """
     It takes a mask and a bounding box, and returns a mask that is cropped to the bounding box.
 
     Args:
         masks (torch.Tensor): [n, h, w] tensor of masks
         boxes (torch.Tensor): [n, 4] tensor of bbox coordinates in relative point form
+        box_margin_factor (float): The factor by which to scale the bounding box. Defaults to 1
+        box_max_margin (int): The maximum margin to scale the bounding box. Defaults to 30
 
     Returns:
         (torch.Tensor): The masks are being cropped to the bounding box.
     """
     _, h, w = masks.shape
     x1, y1, x2, y2 = torch.chunk(boxes[:, :, None], 4, 1)  # x1 shape(n,1,1)
+
+    # scale the box before the crop
+    if box_margin_factor != 1:
+        # convert to center point and width/height
+        # scale width and height and convert back to x1, y1, x2, y2
+        x, y, bw, bh = (x1 + x2) / 2, (y1 + y2)/2, x2 - x1, y2 - y1
+
+        bw_delta = bw*box_margin_factor - bw
+        bh_delta = bh*box_margin_factor - bh
+
+        # limit delta
+        bw += bw_delta.clamp_max(box_max_margin)
+        bh += bh_delta.clamp_max(box_max_margin)
+
+        x1, x2 = (x - bw / 2).clamp_min(0), (x + bw / 2)
+        y1, y2 = (y - bh / 2).clamp_min(0), (y + bh / 2)
+
     r = torch.arange(w, device=masks.device, dtype=x1.dtype)[None, None, :]  # rows shape(1,1,w)
     c = torch.arange(h, device=masks.device, dtype=x1.dtype)[None, :, None]  # cols shape(1,h,1)
 
@@ -667,7 +686,7 @@ def process_mask_upsample(protos, masks_in, bboxes, shape):
     return masks.gt_(0.5)
 
 
-def process_mask(protos, masks_in, bboxes, shape, upsample=False):
+def process_mask(protos, masks_in, bboxes, shape, upsample=False, box_margin_factor=1, box_max_margin=10):
     """
     Apply masks to bounding boxes using the output of the mask head.
 
@@ -695,13 +714,13 @@ def process_mask(protos, masks_in, bboxes, shape, upsample=False):
     downsampled_bboxes[:, 3] *= height_ratio
     downsampled_bboxes[:, 1] *= height_ratio
 
-    masks = crop_mask(masks, downsampled_bboxes)  # CHW
+    masks = crop_mask(masks, downsampled_bboxes, box_margin_factor, box_max_margin)  # CHW
     if upsample:
         masks = F.interpolate(masks[None], shape, mode="bilinear", align_corners=False)[0]  # CHW
     return masks
 
 
-def process_mask_native(protos, masks_in, bboxes, shape):
+def process_mask_native(protos, masks_in, bboxes, shape, box_margin_factor=1, box_max_margin=30):
     """
     It takes the output of the mask head, and crops it after upsampling to the bounding boxes.
 
@@ -717,8 +736,8 @@ def process_mask_native(protos, masks_in, bboxes, shape):
     c, mh, mw = protos.shape  # CHW
     masks = (masks_in @ protos.float().view(c, -1)).sigmoid().view(-1, mh, mw)
     masks = scale_masks(masks[None], shape)[0]  # CHW
-    masks = crop_mask(masks, bboxes)  # CHW
-    return masks.gt_(0.5)
+    masks = crop_mask(masks, bboxes, box_margin_factor, box_max_margin)  # CHW
+    return masks
 
 
 def scale_masks(masks, shape, padding=True):
