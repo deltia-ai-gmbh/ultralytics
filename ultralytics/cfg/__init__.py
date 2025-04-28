@@ -202,7 +202,7 @@ CFG_INT_KEYS = frozenset(
         "line_width",
         "nbs",
         "save_period",
-        "box_margin_factor",
+        "box_max_margin",
     }
 )
 CFG_BOOL_KEYS = frozenset(
